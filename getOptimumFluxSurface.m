@@ -1,5 +1,5 @@
 function  [surface_coefficients, st, v, r, gof]=getOptimumFluxSurface(IM_model_param)
-
+tic
 %This function provides the parameters p00, p10... for a poly 3-3 surface
 %function providing the optimum stator flux reference (in terms of loss
 %minimization) in steady state for a squirrel cage induction motor,
@@ -37,7 +37,7 @@ coeff_high_Rfe=IM_model_param.coeff_high_Rfe; % Coefficients for Rfe=fn(f) in oh
 
 maxRotorSpeed=IM_model_param.maxRotorSpeed; % Maximum speed that the IM is expected to function with (rad/s)
 currentLimit=IM_model_param.currentLimit; %Maximum current that the IM can withstand (A)
-
+maxTorque=IM_model_param.maxTorque; %Maxium torque considered
 
 % Sweep of input values
 
@@ -45,7 +45,7 @@ currentLimit=IM_model_param.currentLimit; %Maximum current that the IM can withs
 %Voltage Vrms in stator
 maxVrms=Vdc/sqrt(2);
 stepVrms=round(maxVrms/400);
-Vrms_in=1:stepVrms:maxVrms;  
+Vrms_in=0:stepVrms:maxVrms;  
 
 %Slip (fixed range)
 s_in=-0.05:0.002:0.05;
@@ -53,7 +53,7 @@ s_in=-0.05:0.002:0.05;
 %Rotor speed (rpm)
 max_n=30/pi*maxRotorSpeed;
 step_n=round(max_n/3000,1);
-n_in=1:step_n:max_n;
+n_in=0:step_n:max_n;
 
 %Determine sizes
 size_V=length(Vrms_in);
@@ -100,27 +100,39 @@ r=nan(length(s),2);
 
 for i=1:length(s)
    
-    %Matrices for the model
-    A=[0 Rs+Rfe(i); 0 Rfe(i)];
-    B=[0 Rfe(i); -j*we(i) Rr+Rfe(i)];
-    C=[j*ws(i) 0; 0 0];
-    D=[0 0; j*ws(i) 0];
-    E=[Lr(i)/Lm(i) (Lm(i)^2-Lr(i)*Ls(i))/Lm(i); 1/Lm(i) -Ls(i)/Lm(i)];
+    A=[j*ws(i) Rs+Rfe(i); 0 Rfe(i)];
+    B=[0 Rfe(i); j*(ws(i)-we(i)) Rr+Rfe(i)];
+%     C=[0 0; 0 0];
+%     D=[0 0; 0 0];
+    E=[Lr/Lm (Lm^2-Lr*Ls)/Lm; 1/Lm -Ls/Lm];
     
-    aux=A+C+B*E+D*E;
-    
-    %Solve the model
+    aux=A+B*E;
     
     v(i,:)=[Vs(i); 0];
     
-    st(i,:)=inv(aux)*v(i,:)';
+    st(i,:)=inv(aux)*v(i,:).';
     
-    r(i,:)=E*st(i,:)';
+    r(i,:)=E*st(i,:).';
+    
+   if i==round(length(s)/4)
+      disp('Cuarto')
+      toc
+   end
+   
+      if i==round(length(s)/2)
+      disp('Mitad')
+      toc
+      end
+      
+      if i==round(3*length(s)/4)
+      disp('3/4')
+      toc
+      end
+    
    
     
 end
 
-%Store IM variables in vectors
 
 Is=st(:,2);
 Flux_s=st(:,1);
@@ -153,7 +165,7 @@ Ploss_total=Ploss_cu+Ploss_iron;
 
 %% PART 2: Store minimum values for flux reference for specific values of wr and Te
 
-discrete_Te_in=1:50:700;
+discrete_Te_in=1:50:maxTorque;
 discrete_wr_in=1:5:250;
 
 
@@ -190,43 +202,55 @@ for i=1:length(discrete_wr)
     end
     
     optFlux(i)=min_flux;
+    
+      if i==round(length(discrete_wr)/4)
+      disp('Cuarto')
+      toc
+      end
+   
+      if i==round(length(discrete_wr)/2)
+      disp('Mitad')
+      toc
+      end
+      
+      if i==round(3*length(discrete_wr)/4)
+      disp('3/4')
+      toc
+      end
+    
 end
 
 %% PART 3: Obtain best fitting surface to the optimum flux points
 
 [xData, yData, zData] = prepareSurfaceData( discrete_wr, discrete_Te, optFlux );
-% 
-% % Set up fittype and options.
-% ft = 'thinplateinterp';
-% 
-% %Spline
-% % Fit model to data.
-% [fitresult, gof] = fit( [xData, yData], zData, ft, 'Normalize', 'on' );
 
-
-%Polynomial
 % Set up fittype and options.
 ft = fittype( 'poly33' );
 opts = fitoptions( 'Method', 'LinearLeastSquares' );
 opts.Robust = 'LAR';
 
-
 % Fit model to data.
 [fitresult_poly, gof] = fit( [xData, yData], zData, ft, opts );
 
 
-
 figure( 'Name', 'Optimum flux reference surface' );
 % h = plot( fitresult, [xData, yData], zData);
-h = plot( fitresult_poly);
+h = plot(fitresult_poly);
 hold on
 scatter3(discrete_wr, discrete_Te, optFlux,'.');
-legend( h, 'untitled fit 1', 'optFlux vs. discrete_wr, discrete_Te', 'Location', 'NorthEast', 'Interpreter', 'none' );
 % Label axes
-xlabel( 'discrete_wr', 'Interpreter', 'none' );
-ylabel( 'discrete_Te', 'Interpreter', 'none' );
-zlabel( 'optFlux', 'Interpreter', 'none' );
+xlabel( 'Rotor speed (rad/s)','FontSize',20)
+ylabel( 'Torque (Nm)','FontSize',20)
+zlabel( 'Optimum stator flux (Wb)','FontSize',20)
 grid on
+grid minor
+
+h.FaceColor='none';
+h.EdgeColor='interp';
+colormap jet
+% colorbar
+
+set(gca,'FontSize',20)
 
 surface_coefficients=coeffvalues(fitresult_poly);
 
