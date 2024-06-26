@@ -1,0 +1,1 @@
+getOptimumFluxSurface cointains a Matlab function that provides a surface function that provides the optimum stator flux reference for given torque and speed operation points of a specific induction machine. The operation limits and parameters of such induction machine are user defined. 
