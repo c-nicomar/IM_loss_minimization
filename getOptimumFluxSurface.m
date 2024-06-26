@@ -1,4 +1,4 @@
-function  [surface_coefficients, st, v, r, gof]=getOptimumFluxSurface(IM_model_param)
+function  [surface_coefficients,fitresult_poly, st, v, r, gof]=getOptimumFluxSurface(IM_model_param)
 tic
 %This function provides the parameters p00, p10... for a poly 3-3 surface
 %function providing the optimum stator flux reference (in terms of loss
@@ -32,8 +32,10 @@ Lm1=IM_model_param.Lm1; %Magnetizing inductance for paralell Rfe model
 p=IM_model_param.p; %Pole pairs
 Vdc=IM_model_param.Vdc; %DC voltage at inverter
 
-coeff_low_Rfe=IM_model_param.coeff_low_Rfe; % Coefficients for Rfe=fn(f)in ohms for f<50 Hz: coeff_low_Rfe(1)+coeff_low_Rfe(2)*f+coeff_low_Rfe(3)*f^2 (paralel model)
-coeff_high_Rfe=IM_model_param.coeff_high_Rfe; % Coefficients for Rfe=fn(f) in ohms for f>50 Hz: coeff_high_Rfe(1)+coeff_high_Rfe/f (paralel model)
+% coeff_low_Rfe=IM_model_param.coeff_low_Rfe; % Coefficients for Rfe=fn(f)in ohms for f<50 Hz: coeff_low_Rfe(1)+coeff_low_Rfe(2)*f+coeff_low_Rfe(3)*f^2 (paralel model)
+% coeff_high_Rfe=IM_model_param.coeff_high_Rfe; % Coefficients for Rfe=fn(f) in ohms for f>50 Hz: coeff_high_Rfe(1)+coeff_high_Rfe/f (paralel model)
+
+Rfe_coeff=IM_model_param.Rfe_coeff;
 
 maxRotorSpeed=IM_model_param.maxRotorSpeed; % Maximum speed that the IM is expected to function with (rad/s)
 currentLimit=IM_model_param.currentLimit; %Maximum current that the IM can withstand (A)
@@ -74,9 +76,11 @@ ws=we./(1-s);       %Syncronous speed in rad/s
 f=ws./(2*pi);       %Syncronous frequency in Hz
 
 %Rfe
+Rfe=Rfe_coeff(1)+ Rfe_coeff(2).*abs(ws)+Rfe_coeff(3).*ws.^2;
+Rfe(f>50)=25.5425e-3-4.82058./ws(f>50);
 
+%Rfe=coeff_low_Rfe.*ws+coeff_high_Rfe.*ws.^2;
 
-Rfe=coeff_low_Rfe.*ws+coeff_high_Rfe.*ws.^2;
 Lm=Lm1;
 
 Ls=Lds+Lm;
@@ -165,7 +169,7 @@ Ploss_total=Ploss_cu+Ploss_iron;
 
 %% PART 2: Store minimum values for flux reference for specific values of wr and Te
 
-discrete_Te_in=1:50:maxTorque;
+discrete_Te_in=50:50:maxTorque;
 discrete_wr_in=1:5:250;
 
 
